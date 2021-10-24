@@ -1,7 +1,7 @@
 #include "iostream"
 #include "jni.h"
 #include "Image.h"
-#include "math.h"
+#include <cmath>
 
 #define NUM_OF_BANDS 3
 
@@ -25,8 +25,6 @@ int getFilterCoeff(int *filter, int filterSize, int i, int j) {
 }
 
 void getRgb(const int *pixels, int width, int u, int v, int *rgb) {
-    // TODO: Add length assert for rgb
-
     const int index = NUM_OF_BANDS * (v * width + u);
 
     rgb[0] = pixels[index + 2];
@@ -35,8 +33,6 @@ void getRgb(const int *pixels, int width, int u, int v, int *rgb) {
 }
 
 void setRgb(int *pixels, int width, int u, int v, const int *rgb) {
-    // TODO: Add length assert for rgb
-
     const int index = NUM_OF_BANDS * (v * width + u);
 
     pixels[index + 2] = rgb[0];
@@ -64,7 +60,7 @@ JNIEXPORT void JNICALL Java_Image_filtering(
 
     for (int v = 0; v < height; v++) {
         for (int u = 0; u < width; u++) {
-            int *sum = new int[NUM_OF_BANDS];
+            int sum[] = {0, 0, 0};
 
             for (int j = 0; j < filterSize; j++) {
                 int v0 = v + j - filterSizeD2;
@@ -89,12 +85,11 @@ JNIEXPORT void JNICALL Java_Image_filtering(
                         sum[c] += rgb[c] * filterCoeff;
                     }
                 }
-
-                for (int c = 0; c < NUM_OF_BANDS; c++) {
-                    sum[c] = clamp(128 + sum[c]);
-                }
-                setRgb(pixelsOutValues, width, u, v, sum);
             }
+            for (auto &c: sum) {
+                c = clamp(128 + c);
+            }
+            setRgb(pixelsOutValues, width, u, v, sum);
         }
     }
 
