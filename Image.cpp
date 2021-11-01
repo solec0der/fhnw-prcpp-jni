@@ -1,43 +1,26 @@
-#include "iostream"
 #include "jni.h"
 #include "Image.h"
-#include <cmath>
+#include "math.h"
 
-#define NUM_OF_BANDS 3
+constexpr int numOfBands = 3;
 
 JNIEXPORT void JNICALL Java_Image_inverting(
         JNIEnv *env, jclass, jint width, jint height, jintArray pixels
 ) {
-    jboolean isCopy = false;
+    jboolean isCopy;
     jint *pixelValues = env->GetIntArrayElements(pixels, &isCopy);
 
-    int arrLen = NUM_OF_BANDS * width * height;
+    int arrLen = numOfBands * width * height;
 
     for (int i = 0; i < arrLen; i++) {
         pixelValues[i] = ~pixelValues[i];
     }
 
-    env->ReleaseIntArrayElements(pixels, pixelValues, 1);
+    env->ReleaseIntArrayElements(pixels, pixelValues, 0);
 }
 
 int getFilterCoeff(int *filter, int filterSize, int i, int j) {
     return filter[j * filterSize + i];
-}
-
-void getRgb(const int *pixels, int width, int u, int v, int *rgb) {
-    const int index = NUM_OF_BANDS * (v * width + u);
-
-    rgb[0] = pixels[index + 2];
-    rgb[1] = pixels[index + 1];
-    rgb[2] = pixels[index + 0];
-}
-
-void setRgb(int *pixels, int width, int u, int v, const int *rgb) {
-    const int index = NUM_OF_BANDS * (v * width + u);
-
-    pixels[index + 2] = rgb[0];
-    pixels[index + 1] = rgb[1];
-    pixels[index + 0] = rgb[2];
 }
 
 int clamp(int v) {
@@ -47,7 +30,7 @@ int clamp(int v) {
 JNIEXPORT void JNICALL Java_Image_filtering(
         JNIEnv *env, jclass, jint width, jint height, jintArray filter, jintArray pixelsIn, jintArray pixelsOut
 ) {
-    jboolean isCopy = false;
+    jboolean isCopy;
 
     const int filterSize = (int) sqrt(env->GetArrayLength(filter));
     const int filterSizeD2 = filterSize / 2;
@@ -56,11 +39,9 @@ JNIEXPORT void JNICALL Java_Image_filtering(
     int *pixelsInValues = env->GetIntArrayElements(pixelsIn, &isCopy);
     int *pixelsOutValues = env->GetIntArrayElements(pixelsOut, &isCopy);
 
-    int *rgb = new int[NUM_OF_BANDS];
-
     for (int v = 0; v < height; v++) {
         for (int u = 0; u < width; u++) {
-            int sum[] = {0, 0, 0};
+            int sum[numOfBands] = {0};
 
             for (int j = 0; j < filterSize; j++) {
                 int v0 = v + j - filterSizeD2;
@@ -78,20 +59,20 @@ JNIEXPORT void JNICALL Java_Image_filtering(
                     } else if (u0 >= width) {
                         u0 = 2 * width - u0 - 1;
                     }
+                    const int index = numOfBands * (v0 * width + u0);
 
-                    getRgb(pixelsInValues, width, u0, v0, rgb);
-
-                    for (int c = 0; c < NUM_OF_BANDS; c++) {
-                        sum[c] += rgb[c] * filterCoeff;
+                    for (int c = 0; c < numOfBands; c++) {
+                        sum[c] += pixelsInValues[index + numOfBands - 1 - c] * filterCoeff;
                     }
                 }
             }
-            for (auto &c: sum) {
-                c = clamp(128 + c);
+            const int index = numOfBands * (v * width + u);
+
+            for (int c = 0; c < numOfBands; c++) {
+                pixelsOutValues[index + numOfBands - 1 - c] = clamp(128 + sum[c]);
             }
-            setRgb(pixelsOutValues, width, u, v, sum);
         }
     }
 
-    env->ReleaseIntArrayElements(pixelsOut, pixelsOutValues, 1);
+    env->ReleaseIntArrayElements(pixelsOut, pixelsOutValues, 0);
 }
